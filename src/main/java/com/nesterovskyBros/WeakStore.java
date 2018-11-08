@@ -11,7 +11,7 @@ import java.util.function.Supplier;
  * Value is kept only if all keys are alive, otherwise value is reclaimed.</p>
  * <p><b>Note:</b> class is thread safe</p>
  *
- * @param <T> an instance type to strore.
+ * @param <T> an instance type to store.
  */
 public class WeakStore<T>
 {
