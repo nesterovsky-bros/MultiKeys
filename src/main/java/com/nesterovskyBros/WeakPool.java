@@ -57,7 +57,7 @@ public class WeakPool<T>
   /**
    * <p>Polls this store and cleans reclaimed data.</p>
    * <p><b>Note:</b> this method is automatically called by 
-   * {@link #contains(T)}, {@link #get(T)} methods.
+   * {@link #contains(T)} and {@link #get(T)} methods.
    */
   public void poll()
   {
