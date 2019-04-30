@@ -24,7 +24,7 @@ public class WeakPool<T>
   }
 
   /**
-   * Gets an instance by value.
+   * Gets a value from the pool.
    * @param value a value to get from pool.
    * @return a pooled value.
    */
