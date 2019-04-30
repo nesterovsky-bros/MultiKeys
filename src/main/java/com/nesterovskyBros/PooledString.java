@@ -3,9 +3,9 @@ package com.nesterovskyBros;
 /**
  * A string pool sample.
  */
-public class StringPool
+public class PooledString
 {
-  public static String get(String value)
+  public static String of(String value)
   {
     return pool.get(value);
   }

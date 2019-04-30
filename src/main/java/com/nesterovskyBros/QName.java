@@ -5,7 +5,7 @@ package com.nesterovskyBros;
  */
 public class QName
 {
-  public static QName get(String localname, String namespace)
+  public static QName of(String localname, String namespace)
   {
     return pool.get(new QName(localname, namespace));
   }

@@ -5,7 +5,7 @@ package com.nesterovskyBros;
  */
 public class EQName
 {
-  public static EQName get(String prefix, QName qname)
+  public static EQName of(String prefix, QName qname)
   {
     return pool.get(new EQName(prefix, qname));
   }
