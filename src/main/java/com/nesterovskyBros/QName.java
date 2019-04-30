@@ -1,7 +1,7 @@
 package com.nesterovskyBros;
 
 /**
- * A qname sample.
+ * A sample of qname.
  */
 public class QName
 {

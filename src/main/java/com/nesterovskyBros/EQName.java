@@ -1,7 +1,7 @@
 package com.nesterovskyBros;
 
 /**
- * A qname with prefix sample.
+ * A sample of qname with prefix.
  */
 public class EQName
 {
