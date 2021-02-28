@@ -18,7 +18,7 @@ public class WeakStore<T>
   /**
    * Gets an instance by keys.
    * @param keys an array of keys.
-   * @return an instance, if avaliable.
+   * @return an instance, if available.
    */
   public T get(Object ...keys)
   {
