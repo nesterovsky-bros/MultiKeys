@@ -44,7 +44,7 @@ public class WeakStore<T>
   }
   
   /**
-   * Sests or remove an instance by keys.
+   * Sets or remove an instance by keys.
    * @param value a value to set, or {@code null} to remove.
    * @param keys an array of keys.
    * @return a replaced instance.
