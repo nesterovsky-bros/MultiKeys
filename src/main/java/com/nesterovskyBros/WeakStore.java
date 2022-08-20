@@ -140,7 +140,7 @@ public class WeakStore<T>
         }
       }
       
-      return false;
+      return true;
     }
     
     private final int hashCode;
