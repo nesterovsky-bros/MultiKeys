@@ -9,7 +9,9 @@ import java.util.function.Supplier;
 /**
  * <p>A store to keep objects by multiple weak keys.
  * Value is kept only if all keys are alive, otherwise value is reclaimed.</p>
- * <p><b>Note:</b> class is thread safe</p>
+ * <p><b>Note:</b> do not have strong references to all keys in an instance
+ * of T kept in the store.</p>
+ * <p><b>Note:</b> class is thread safe.</p>
  *
  * @param <T> an instance type to store.
  */
