@@ -48,17 +48,7 @@ public class WeakStore<T>
     poll();
     
     Key<T> key = new Key<>(queue, null, keys);
-    
-    T value = store.computeIfAbsent(
-      key, 
-      k -> 
-      {
-        T v = factory.get();
-        
-        k.value = v;
-        
-        return v;
-      });
+    T value = store.computeIfAbsent(key,k -> k.value = factory.get());
     
     if (key.value == null)
     {
