@@ -1,5 +1,6 @@
 package com.nesterovskyBros;
 
+import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 
@@ -20,7 +21,7 @@ public class WeakPool<T>
   {
     poll();
     
-    return store.contains(new Ref<T>(value, queue));
+    return store.contains(new Ref<>(value, null));
   }
 
   /**
@@ -32,7 +33,7 @@ public class WeakPool<T>
   {
     poll();
 
-    Ref<T> ref = new Ref<T>(value, queue);
+    Ref<T> ref = new Ref<>(value, queue);
     
     while(true)
     {
@@ -47,6 +48,8 @@ public class WeakPool<T>
       
       if (oldValue != null)
       {
+        ref.clear();
+        
         return oldValue;
       }
       
@@ -63,8 +66,7 @@ public class WeakPool<T>
   {
     while(true)
     {
-      @SuppressWarnings("unchecked")
-      Ref<T> ref = (Ref<T>)queue.poll();
+      Reference<?> ref = queue.poll();
       
       if (ref == null)
       {
@@ -97,16 +99,9 @@ public class WeakPool<T>
         return true;
       }
 
-      @SuppressWarnings("unchecked")
-      Ref<T> that = (Ref<T>)obj;
-      
-      if (hashCode != that.hashCode)
-      {
-        return false;
-      }
-      
       T value = get();
-      T thatValue = that.get();
+      @SuppressWarnings("unchecked")
+      T thatValue = ((Ref<T>)obj).get();
       
       return (value != null) && (thatValue != null) && value.equals(thatValue);
     }

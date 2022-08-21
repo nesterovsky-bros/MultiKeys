@@ -1,5 +1,6 @@
 package com.nesterovskyBros;
 
+import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 import java.util.Objects;
@@ -26,10 +27,7 @@ public class WeakStore<T>
   {
     poll();
     
-    Key<T> key = new Key<>(queue, keys);
-    Key<T> value = store.get(key);
-    
-    key.clear();
+    Key<T> value = store.get(new Key<>(null, keys));
     
     return value == null ? null : value.value;
   }
@@ -111,15 +109,15 @@ public class WeakStore<T>
   {
     while(true)
     {
-      @SuppressWarnings("unchecked")
-      Ref<T> ref = (Ref<T>)queue.poll();
+      Reference<?> ref = queue.poll();
       
       if (ref == null)
       {
         break;
       }
       
-      Key<T> key = ref.key;
+      @SuppressWarnings("unchecked")
+      Key<T> key = ((Ref<T>)ref).key;
       
       if (key.value != null)
       {
@@ -173,18 +171,8 @@ public class WeakStore<T>
         return true;
       }
 
-      if (!(obj instanceof Key))
-      {
-        return false;
-      }
-      
       @SuppressWarnings("unchecked")
       Key<T> that = (Key<T>)obj;
-      
-      if (hashCode != that.hashCode)
-      {
-        return false;
-      }
       
       if (refs.length != that.refs.length)
       {
