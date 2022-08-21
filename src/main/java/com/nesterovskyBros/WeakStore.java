@@ -26,12 +26,12 @@ public class WeakStore<T>
   {
     poll();
     
-    Key<T> key = new Key<>(queue, null, keys);
-    T value = store.get(key);
+    Key<T> key = new Key<>(queue, keys);
+    Key<T> value = store.get(key);
     
     key.clear();
     
-    return value;
+    return value == null ? null : value.value;
   }
   
   /**
@@ -47,15 +47,23 @@ public class WeakStore<T>
   {
     poll();
     
-    Key<T> key = new Key<>(queue, null, keys);
-    T value = store.computeIfAbsent(key,k -> k.value = factory.get());
+    Key<T> key = new Key<>(queue, keys);
+    
+    Key<T> value = store.computeIfAbsent(
+      key,
+      k -> 
+      {
+        k.value = Objects.requireNonNull(factory.get());
+        
+        return k;
+      });
     
     if (key.value == null)
     {
       key.clear();
     }
     
-    return value;
+    return value.value;
   }
   
   /**
@@ -68,20 +76,29 @@ public class WeakStore<T>
   {
     poll();
     
-    Key<T> key = new Key<>(queue, value, keys);
+    Key<T> key = new Key<>(queue, keys);
+    Key<T> prev;  
     
     if (value == null)
     {
-      T result = store.remove(key);
-      
+      prev = store.remove(key);  
       key.clear();
-      
-      return result;
     }
     else
     {
-      return store.put(key, value);
+      key.value = value;
+      prev = store.put(key, key);  
     }
+
+    if (prev == null)
+    {
+      return null;
+    }
+    
+    value = prev.value;
+    prev.clear();
+    
+    return value;
   }
   
   /**
@@ -103,11 +120,10 @@ public class WeakStore<T>
       }
       
       Key<T> key = ref.key;
-      T value = key.value;
       
-      if (value != null)
+      if (key.value != null)
       {
-        store.remove(key, value);
+        store.remove(key, key);
         key.clear();
       }
     }
@@ -116,7 +132,7 @@ public class WeakStore<T>
   private static class Key<T>
   {
     @SuppressWarnings("unchecked")
-    public Key(ReferenceQueue<Object> queue, T value, Object ...keys)
+    public Key(ReferenceQueue<Object> queue, Object ...keys)
     {
       int hashCode = 0;
       
@@ -131,7 +147,6 @@ public class WeakStore<T>
       }
       
       this.hashCode = hashCode;
-      this.value = value;
     }
     
     public void clear()
@@ -190,9 +205,9 @@ public class WeakStore<T>
       return true;
     }
     
-    private T value;
     private final int hashCode;
     private final Ref<T>[] refs;
+    private T value;
   }
   
   private static class Ref<T> extends WeakReference<Object>
@@ -207,5 +222,6 @@ public class WeakStore<T>
   }
   
   private final ReferenceQueue<Object> queue = new ReferenceQueue<>();
-  private final ConcurrentHashMap<Key<T>, T> store = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<Key<T>, Key<T>> store = 
+    new ConcurrentHashMap<>();
 }
