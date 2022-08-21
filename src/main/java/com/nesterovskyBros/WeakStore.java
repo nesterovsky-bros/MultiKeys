@@ -26,7 +26,7 @@ public class WeakStore<T>
   {
     poll();
     
-    Key key = new Key(queue, keys);
+    Key<T> key = new Key<>(queue, null, keys);
     T value = store.get(key);
     
     key.clear();
@@ -47,10 +47,23 @@ public class WeakStore<T>
   {
     poll();
     
-    Key key = new Key(queue, keys);
-    T value = store.computeIfAbsent(key, k -> factory.get());
+    Key<T> key = new Key<>(queue, null, keys);
     
-    key.clear();
+    T value = store.computeIfAbsent(
+      key, 
+      k -> 
+      {
+        T v = factory.get();
+        
+        k.value = v;
+        
+        return v;
+      });
+    
+    if (key.value == null)
+    {
+      key.clear();
+    }
     
     return value;
   }
@@ -65,12 +78,20 @@ public class WeakStore<T>
   {
     poll();
     
-    Key key = new Key(queue, keys);
-    T result = value == null ? store.remove(key) : store.put(key, value);
+    Key<T> key = new Key<>(queue, value, keys);
     
-    key.clear();
-    
-    return result;
+    if (value == null)
+    {
+      T result = store.remove(key);
+      
+      key.clear();
+      
+      return result;
+    }
+    else
+    {
+      return store.put(key, value);
+    }
   }
   
   /**
@@ -83,21 +104,29 @@ public class WeakStore<T>
   {
     while(true)
     {
-      Ref ref = (Ref)queue.poll();
+      @SuppressWarnings("unchecked")
+      Ref<T> ref = (Ref<T>)queue.poll();
       
       if (ref == null)
       {
         break;
       }
       
-      store.remove(ref.key);
-      ref.key.clear();
+      Key<T> key = ref.key;
+      T value = key.value;
+      
+      if (value != null)
+      {
+        store.remove(key, value);
+        key.clear();
+      }
     }
   }
   
-  private static class Key
+  private static class Key<T>
   {
-    public Key(ReferenceQueue<Object> queue, Object ...keys)
+    @SuppressWarnings("unchecked")
+    public Key(ReferenceQueue<Object> queue, T value, Object ...keys)
     {
       int hashCode = 0;
       
@@ -108,14 +137,17 @@ public class WeakStore<T>
         Object key = Objects.requireNonNull(keys[i]);
 
         hashCode ^= key.hashCode();
-        refs[i] = new Ref(key, queue, this);
+        refs[i] = new Ref<T>(key, queue, this);
       }
       
       this.hashCode = hashCode;
+      this.value = value;
     }
     
     public void clear()
     {
+      value = null;
+
       for(int i = 0; i < refs.length; ++i)
       {
         refs[i].clear();
@@ -141,7 +173,8 @@ public class WeakStore<T>
         return false;
       }
       
-      Key that = (Key)obj;
+      @SuppressWarnings("unchecked")
+      Key<T> that = (Key<T>)obj;
       
       if (hashCode != that.hashCode)
       {
@@ -167,21 +200,22 @@ public class WeakStore<T>
       return true;
     }
     
+    private T value;
     private final int hashCode;
-    private final Ref[] refs;
+    private final Ref<T>[] refs;
   }
   
-  private static class Ref extends WeakReference<Object>
+  private static class Ref<T> extends WeakReference<Object>
   {
-    public Ref(Object value, ReferenceQueue<Object> queue, Key key)
+    public Ref(Object value, ReferenceQueue<Object> queue, Key<T> key)
     {
       super(value, queue);
       this.key = key;
     }
     
-    private final Key key;
+    private final Key<T> key;
   }
   
   private final ReferenceQueue<Object> queue = new ReferenceQueue<>();
-  private final ConcurrentHashMap<Key, T> store = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<Key<T>, T> store = new ConcurrentHashMap<>();
 }
