@@ -26,7 +26,12 @@ public class WeakStore<T>
   {
     poll();
     
-    return store.get(new Key(queue, keys));
+    Key key = new Key(queue, keys);
+    T value = store.get(key);
+    
+    key.clear();
+    
+    return value;
   }
   
   /**
@@ -42,7 +47,12 @@ public class WeakStore<T>
   {
     poll();
     
-    return store.computeIfAbsent(new Key(queue, keys), key -> factory.get());
+    Key key = new Key(queue, keys);
+    T value = store.computeIfAbsent(key, k -> factory.get());
+    
+    key.clear();
+    
+    return value;
   }
   
   /**
@@ -56,8 +66,11 @@ public class WeakStore<T>
     poll();
     
     Key key = new Key(queue, keys);
+    T result = value == null ? store.remove(key) : store.put(key, value);
     
-    return value == null ? store.remove(key) : store.put(key, value);
+    key.clear();
+    
+    return result;
   }
   
   /**
@@ -78,6 +91,7 @@ public class WeakStore<T>
       }
       
       store.remove(ref.key);
+      ref.key.clear();
     }
   }
   
@@ -98,6 +112,14 @@ public class WeakStore<T>
       }
       
       this.hashCode = hashCode;
+    }
+    
+    public void clear()
+    {
+      for(int i = 0; i < refs.length; ++i)
+      {
+        refs[i].clear();
+      }
     }
     
     @Override
@@ -133,10 +155,10 @@ public class WeakStore<T>
       
       for(int i = 0; i < refs.length; ++i)
       {
-        Object key = refs[i].get();
-        Object thatKey = that.refs[i].get();
+        Object value = refs[i].get();
+        Object thatValue = that.refs[i].get();
         
-        if ((key != thatKey) || (key == null))
+        if ((value != thatValue) || (value == null))
         {
           return false;
         }
