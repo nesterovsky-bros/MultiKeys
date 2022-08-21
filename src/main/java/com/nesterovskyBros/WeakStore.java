@@ -123,8 +123,8 @@ public class WeakStore<T>
       
       if (key.value != null)
       {
-        store.remove(key, key);
         key.clear();
+        store.remove(key);
       }
     }
   }
