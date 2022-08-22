@@ -5,6 +5,7 @@ import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
@@ -27,39 +28,51 @@ public class WeakStore<T>
   {
     poll();
     
-    Key<T> value = store.get(new Key<>(null, keys));
+    Key<T> value = store.get(new Key<>(keys));
     
     return value == null ? null : value.value;
   }
   
   /**
    * <p>Gets or creates an instance, if it was not in the store, by keys.</p>
-   * <p><b>Note:</b> If factory is called then it runs within lock. 
+   * <p><b>Note:</b> If create is called then it runs within lock. 
    * Its computation should be short and simple, and must not attempt to 
    * update any other mappings of this store.</p>
-   * @param factory a value factory.
+   * @param create a value factory.
    * @param keys an array of keys.
    * @return an instance.
    */
-  public T getOrCreate(Supplier<T> factory, Object ...keys)
+  public T getOrCreate(Supplier<T> create, Object ...keys)
+  {
+    return getOrCreate(create, null, keys);
+  }
+
+  /**
+   * <p>Gets or creates an instance, if it was not in the store, by keys.</p>
+   * <p><b>Note:</b> If create is called then it runs within lock. 
+   * Its computation should be short and simple, and must not attempt to 
+   * update any other mappings of this store.</p>
+   * @param create a value factory.
+   * @param release optional function to call upon release of value.
+   * @param keys an array of keys.
+   * @return an instance.
+   */
+  public T getOrCreate(Supplier<T> create, Consumer<T> release, Object ...keys)
   {
     poll();
     
-    Key<T> key = new Key<>(queue, keys);
+    Key<T> key = new Key<>(keys);
     
     Key<T> value = store.computeIfAbsent(
       key,
       k -> 
       {
-        k.value = Objects.requireNonNull(factory.get());
+        k.makeRefs(queue);
+        k.release = release;
+        k.value = Objects.requireNonNull(create.get());
         
         return k;
       });
-    
-    if (key.value == null)
-    {
-      key.clear();
-    }
     
     return value.value;
   }
@@ -72,18 +85,31 @@ public class WeakStore<T>
    */
   public T set(T value, Object ...keys)
   {
+    return set(value, null, keys);
+  }
+  
+  /**
+   * Sets or removes an instance by keys.
+   * @param value a value to set, or {@code null} to remove.
+   * @param release optional function to call upon release of value.
+   * @param keys an array of keys.
+   * @return a replaced instance.
+   */
+  public T set(T value, Consumer<T> release, Object ...keys)
+  {
     poll();
     
-    Key<T> key = new Key<>(queue, keys);
+    Key<T> key = new Key<>(keys);
     Key<T> prev;  
     
     if (value == null)
     {
       prev = store.remove(key);  
-      key.clear();
     }
     else
     {
+      key.makeRefs(queue);
+      key.release = release;
       key.value = value;
       prev = store.put(key, key);  
     }
@@ -98,7 +124,7 @@ public class WeakStore<T>
     
     return value;
   }
-  
+
   /**
    * <p>Polls this store and cleans reclaimed data.</p>
    * <p><b>Note:</b> this method is automatically called by 
@@ -121,39 +147,49 @@ public class WeakStore<T>
       
       if (key.value != null)
       {
-        key.clear();
         store.remove(key);
+        key.clear();
       }
     }
   }
   
   private static class Key<T>
   {
-    @SuppressWarnings("unchecked")
-    public Key(ReferenceQueue<Object> queue, Object ...keys)
+    public Key(Object[] keys)
     {
       int hashCode = 0;
       
-      refs = new Ref[keys.length];
-      
       for(int i = 0; i < keys.length; ++i)
       {
-        Object key = Objects.requireNonNull(keys[i]);
-
-        hashCode ^= key.hashCode();
-        refs[i] = new Ref<T>(key, queue, this);
+        hashCode ^= Objects.requireNonNull(keys[i]).hashCode();
       }
       
       this.hashCode = hashCode;
+      this.keys = keys;
     }
     
+    @SuppressWarnings("unchecked")
     public void clear()
     {
-      value = null;
+      T value = this.value;
+      
+      this.value = null;
 
-      for(int i = 0; i < refs.length; ++i)
+      for(int i = 0; i < keys.length; ++i)
       {
-        refs[i].clear();
+        Object key = keys[i];
+        
+        keys[i] = null;
+
+        if (key instanceof Ref)
+        {
+          ((Ref<T>)key).clear();
+        }
+      }
+      
+      if ((release != null) && (value != null))
+      {
+        release.accept(value);
       }
     }
     
@@ -163,6 +199,7 @@ public class WeakStore<T>
       return hashCode;
     }
     
+    @SuppressWarnings("unchecked")
     @Override
     public boolean equals(Object obj)
     {
@@ -171,19 +208,29 @@ public class WeakStore<T>
         return true;
       }
 
-      @SuppressWarnings("unchecked")
       Key<T> that = (Key<T>)obj;
       
-      if (refs.length != that.refs.length)
+      if (keys.length != that.keys.length)
       {
         return false;
       }
       
-      for(int i = 0; i < refs.length; ++i)
+      for(int i = 0; i < keys.length; ++i)
       {
-        Object value = refs[i].get();
-        Object thatValue = that.refs[i].get();
+        Object value = keys[i];
         
+        if (value instanceof Ref)
+        {
+          value = ((Ref<T>)value).get();
+        }
+        
+        Object thatValue = that.keys[i];
+        
+        if (thatValue instanceof Ref)
+        {
+          thatValue = ((Ref<T>)thatValue).get();
+        }
+
         if ((value != thatValue) || (value == null))
         {
           return false;
@@ -193,9 +240,22 @@ public class WeakStore<T>
       return true;
     }
     
+    private void makeRefs(ReferenceQueue<Object> queue)
+    {
+      Object[] keys = new Object[this.keys.length];
+      
+      for(int i = 0; i < keys.length; ++i)
+      {
+        keys[i] = new Ref<T>(this.keys[i], queue, this);
+      }
+      
+      this.keys = keys;
+    }
+
     private final int hashCode;
-    private final Ref<T>[] refs;
+    private Object[] keys;
     private T value;
+    private Consumer<T> release;
   }
   
   private static class Ref<T> extends WeakReference<Object>
