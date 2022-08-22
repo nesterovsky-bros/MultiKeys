@@ -94,7 +94,11 @@ public class WeakStore<T>
     
     value = prev.value;
     prev.clear();
-    release(value);
+    
+    if (value != null)
+    {
+      release(value);
+    }
     
     return value;
   }
