@@ -6,8 +6,6 @@ import java.lang.ref.WeakReference;
 
 import org.junit.jupiter.api.Test;
 
-import com.nesterovskyBros.WeakStore;
-
 class WeakStoreTest
 {
 
