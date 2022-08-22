@@ -12,20 +12,22 @@ class WeakStoreTest
   @Test
   void test()
   {
-    WeakStore<Object> store = new WeakStore<>();
+    String[] log = { null };
+
+    WeakStore<Object> store = new WeakStore<Object>()
+    {
+      @Override
+      protected void release(Object value)
+      {
+        log[0] = "data is released";
+      }
+    };
     
     Object key1 = new Object();
     Object key2 = new Object();
-    
-    String[] log = { null };
-    
     Object data = new Object();
     
-    store.set(
-      data, 
-      value -> log[0] = "data is released",
-      key1, 
-      key2);
+    store.set(data, key1, key2);
     
     assertTrue(store.get(key1, key2) == data);
     data = null;

@@ -3,9 +3,11 @@ package com.nesterovskyBros;
 import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
+
 import java.util.Objects;
+
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
+
 import java.util.function.Supplier;
 
 /**
@@ -32,7 +34,7 @@ public class WeakStore<T>
     
     return value == null ? null : value.value;
   }
-  
+
   /**
    * <p>Gets or creates an instance, if it was not in the store, by keys.</p>
    * <p><b>Note:</b> If create is called then it runs within lock. 
@@ -44,21 +46,6 @@ public class WeakStore<T>
    */
   public T getOrCreate(Supplier<T> create, Object ...keys)
   {
-    return getOrCreate(create, null, keys);
-  }
-
-  /**
-   * <p>Gets or creates an instance, if it was not in the store, by keys.</p>
-   * <p><b>Note:</b> If create is called then it runs within lock. 
-   * Its computation should be short and simple, and must not attempt to 
-   * update any other mappings of this store.</p>
-   * @param create a value factory.
-   * @param release optional function to call upon release of value.
-   * @param keys an array of keys.
-   * @return an instance.
-   */
-  public T getOrCreate(Supplier<T> create, Consumer<T> release, Object ...keys)
-  {
     poll();
     
     Key<T> key = new Key<>(keys);
@@ -68,7 +55,6 @@ public class WeakStore<T>
       k -> 
       {
         k.makeRefs(queue);
-        k.release = release;
         k.value = Objects.requireNonNull(create.get());
         
         return k;
@@ -85,18 +71,6 @@ public class WeakStore<T>
    */
   public T set(T value, Object ...keys)
   {
-    return set(value, null, keys);
-  }
-  
-  /**
-   * Sets or removes an instance by keys.
-   * @param value a value to set, or {@code null} to remove.
-   * @param release optional function to call upon release of value.
-   * @param keys an array of keys.
-   * @return a replaced instance.
-   */
-  public T set(T value, Consumer<T> release, Object ...keys)
-  {
     poll();
     
     Key<T> key = new Key<>(keys);
@@ -109,7 +83,6 @@ public class WeakStore<T>
     else
     {
       key.makeRefs(queue);
-      key.release = release;
       key.value = value;
       prev = store.put(key, key);  
     }
@@ -121,6 +94,7 @@ public class WeakStore<T>
     
     value = prev.value;
     prev.clear();
+    release(value);
     
     return value;
   }
@@ -144,13 +118,23 @@ public class WeakStore<T>
       
       @SuppressWarnings("unchecked")
       Key<T> key = ((Ref<T>)ref).key;
+      T value = key.value;
       
-      if (key.value != null)
+      if (value != null)
       {
-        store.remove(key);
         key.clear();
+        store.remove(key);
+        release(value);
       }
     }
+  }
+
+  /**
+   * Called when value is released.
+   * @param value a value to release.
+   */
+  protected void release(T value)
+  {
   }
   
   private static class Key<T>
@@ -171,9 +155,7 @@ public class WeakStore<T>
     @SuppressWarnings("unchecked")
     public void clear()
     {
-      T value = this.value;
-      
-      this.value = null;
+      value = null;
 
       for(int i = 0; i < keys.length; ++i)
       {
@@ -185,11 +167,6 @@ public class WeakStore<T>
         {
           ((Ref<T>)key).clear();
         }
-      }
-      
-      if ((release != null) && (value != null))
-      {
-        release.accept(value);
       }
     }
     
@@ -255,7 +232,6 @@ public class WeakStore<T>
     private final int hashCode;
     private Object[] keys;
     private T value;
-    private Consumer<T> release;
   }
   
   private static class Ref<T> extends WeakReference<Object>
