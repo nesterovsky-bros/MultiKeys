@@ -48,19 +48,17 @@ public class WeakStore<T>
   {
     poll();
     
-    Key<T> key = new Key<>(keys);
-    
-    Key<T> value = store.computeIfAbsent(
-      key,
+    Key<T> next = store.computeIfAbsent(
+      new Key<>(keys),
       k -> 
       {
         k.makeRefs(queue);
-        k.value = Objects.requireNonNull(create.get());
+        k.value = create.get();
         
         return k;
       });
     
-    return value.value;
+    return next.value;
   }
   
   /**
@@ -74,33 +72,52 @@ public class WeakStore<T>
     poll();
     
     Key<T> key = new Key<>(keys);
-    Key<T> prev;  
+    T prevValue = null;
     
     if (value == null)
     {
-      prev = store.remove(key);  
+      Key<T> prev = store.remove(key);
+      
+      if (prev != null)
+      {
+        prevValue = prev.value;
+        prev.clear();
+      }
     }
     else
     {
-      key.makeRefs(queue);
-      key.value = value;
-      prev = store.put(key, key);  
+      Key<T> next = store.compute(
+        key, 
+        (k, v) ->
+        {
+          if (v != null)
+          {
+            key.value = v.value;
+            v.value = value;
+
+            return v;
+          }
+          else
+          {
+            k.makeRefs(queue);
+            k.value = value;
+            
+            return k;
+          }
+        });
+      
+      if (next != key)
+      {
+        prevValue = key.value;
+      }
     }
 
-    if (prev == null)
+    if ((prevValue != null) && (prevValue != value))
     {
-      return null;
+      release(prevValue);
     }
     
-    value = prev.value;
-    prev.clear();
-    
-    if (value != null)
-    {
-      release(value);
-    }
-    
-    return value;
+    return prevValue;
   }
 
   /**
@@ -126,8 +143,8 @@ public class WeakStore<T>
       
       if (value != null)
       {
-        key.clear();
         store.remove(key);
+        key.clear();
         release(value);
       }
     }

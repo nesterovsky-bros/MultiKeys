@@ -11,7 +11,7 @@ class WeakStoreTest
   @Test
   void test()
   {
-    String[] log = { null };
+    int[] changes = { 0 };
 
     // For unit test we override release() to capture the call.
     WeakStore<Object> store = new WeakStore<Object>()
@@ -19,7 +19,7 @@ class WeakStoreTest
       @Override
       protected void release(Object value)
       {
-        log[0] = "data is released";
+        ++changes[0];
       }
     };
     
@@ -35,6 +35,16 @@ class WeakStoreTest
     
     // Verify it's in the store.
     assertTrue(store.get(key1, key2) == data);
+
+    gc();
+    
+    // Set data by (key1, key2) again.
+    store.set(data, key1, key2);
+    
+    // Verify nothing has changed.
+    assertTrue(store.get(key1, key2) == data);
+    assertEquals(changes[0], 0);
+
     data = null;
     
     gc();
@@ -42,6 +52,17 @@ class WeakStoreTest
     // Verify data is in the store even after we don't have its firm reference.
     assertNotNull(store.get(key1, key2));
     
+    Object data2 = new Object();
+    
+    // Set data by (key1, key2).
+    store.set(data2, key1, key2);
+    
+    gc();
+
+    // Verify it's in the store.
+    assertTrue(store.get(key1, key2) == data2);
+    assertEquals(changes[0], 1);
+
     // Let key2 to go.
     key2 = null;
     
@@ -51,7 +72,7 @@ class WeakStoreTest
     store.poll();
     
     // Verify that data is released, so entry for (key1, key2) is not there.
-    assertNotNull(log[0]);
+    assertEquals(changes[0], 2);
 
     key2 = new Object();
 
